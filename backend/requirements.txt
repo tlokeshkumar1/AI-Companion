@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic
+motor
+python-dotenv
+bcrypt
+uuid
+email-validator
+google-auth
+google-auth-oauthlib
+google-api-python-client
+langchain
