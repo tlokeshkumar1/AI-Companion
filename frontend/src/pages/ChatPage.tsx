@@ -43,6 +43,8 @@ export default function ChatPage() {
   const loadBotData = async () => {
     try {
       const response = await getBotById(botId!);
+      console.log('Bot data loaded:', response.data);
+      console.log('Avatar path:', response.data.avatar);
       setBot(response.data);
     } catch (error) {
       console.error('Error loading bot data:', error);
@@ -141,9 +143,15 @@ export default function ChatPage() {
             <div className="flex items-center">
               {bot.avatar ? (
                 <img
-                  src={`http://localhost:8000/${bot.avatar}`}
+                  src={bot.avatar.startsWith('http') ? bot.avatar : `http://localhost:8000/uploads/${bot.avatar}`}
                   alt={bot.name}
                   className="w-10 h-10 rounded-full object-cover mr-3"
+                  onError={(e) => {
+                    console.error('Error loading avatar:', bot.avatar);
+                    // Fallback to default avatar if image fails to load
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                  }}
                 />
               ) : (
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mr-3">
@@ -183,9 +191,15 @@ export default function ChatPage() {
             <div className="flex-shrink-0">
               {bot.avatar ? (
                 <img
-                  src={`http://localhost:8000/${bot.avatar}`}
+                  src={bot.avatar.startsWith('http') ? bot.avatar : `http://localhost:8000/uploads/${bot.avatar}`}
                   alt={bot.name}
                   className="w-8 h-8 rounded-full object-cover"
+                  onError={(e) => {
+                    console.error('Error loading avatar:', bot.avatar);
+                    // Fallback to default avatar if image fails to load
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                  }}
                 />
               ) : (
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">

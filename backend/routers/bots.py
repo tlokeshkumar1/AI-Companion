@@ -94,3 +94,14 @@ async def list_my_bots(user_id: str):
                 bot["avatar"] = bot["avatar"].replace("avatars/", "", 1)
             my_bots.append(bot)
     return my_bots
+
+@router.get("/{bot_id}")
+async def get_bot(bot_id: str):
+    bots = load_bots()
+    for bot in bots:
+        if bot.get("bot_id") == bot_id:
+            # Fix avatar path if it starts with avatars/
+            if bot.get("avatar") and bot["avatar"].startswith("avatars/"):
+                bot["avatar"] = bot["avatar"].replace("avatars/", "", 1)
+            return bot
+    raise HTTPException(status_code=404, detail="Bot not found")
