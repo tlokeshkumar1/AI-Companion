@@ -15,7 +15,15 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const [input, setInput] = useState('');
   const [chat, setChat] = useState<ChatMessage[]>([]);
-  const [bot, setBot] = useState<any>(null);
+  interface Bot {
+    id: string;
+    name: string;
+    avatar?: string;
+    type_of_bot?: string;
+    first_message?: string;
+  }
+  
+  const [bot, setBot] = useState<Bot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -55,7 +63,9 @@ export default function ChatPage() {
     setIsLoading(true);
     try {
       const response = await getChatHistory(userId!, botId!);
-      setChat(response.data);
+      if (response.status === 'success' && Array.isArray(response.data)) {
+        setChat(response.data);
+      }
     } catch (error) {
       console.error('Error loading chat history:', error);
     } finally {
@@ -64,7 +74,7 @@ export default function ChatPage() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || isSending) return;
+    if (!input.trim() || isSending || !userId || !botId) return;
 
     const userMessage = input.trim();
     setInput('');

@@ -49,8 +49,27 @@ export const sendMessage = (payload: {
   message: string;
 }) => API.post('/chat/ask', payload);
 
-export const getChatHistory = (userId: string, botId: string) =>
-  API.get(`/chat/history?user_id=${userId}&bot_id=${botId}`);
+export const getChatHistory = async (userId: string, botId: string) => {
+  try {
+    console.log('Fetching chat history with params:', { userId, botId });
+    const response = await API.get(`/chat/history`, {
+      params: { 
+        user_id: userId, 
+        bot_id: botId 
+      }
+    });
+    console.log('Chat history response:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      headers: error.response?.headers
+    });
+    return { status: 'error', data: [], message: error.message };
+  }
+};
 
 export const deleteChatHistory = (userId: string, botId: string) =>
   API.delete(`/chat/history?user_id=${userId}&bot_id=${botId}`);

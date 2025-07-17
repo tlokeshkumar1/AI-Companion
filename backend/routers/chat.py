@@ -40,9 +40,21 @@ async def ask(
 
 @router.get("/history")
 async def get_chat_history(user_id: str, bot_id: str):
-    chat_id = f"{user_id}_{bot_id}"
-    history = await db.chats.find({"chat_id": chat_id}).to_list(None)
-    return history
+    try:
+        chat_id = f"{user_id}_{bot_id}"
+        # Convert MongoDB cursor to list of dicts and handle ObjectId serialization
+        history = []
+        async for doc in db.chats.find({"chat_id": chat_id}).sort("timestamp", 1):
+            # Convert ObjectId to string
+            doc["_id"] = str(doc["_id"])
+            # Convert datetime to ISO format string
+            if "timestamp" in doc:
+                doc["timestamp"] = doc["timestamp"].isoformat()
+            history.append(doc)
+        return {"status": "success", "data": history}
+    except Exception as e:
+        print(f"Error in get_chat_history: {str(e)}")  # Add logging
+        return {"status": "error", "message": str(e)}
 
 @router.delete("/restart")
 async def restart_chat(user_id: str, bot_id: str):
