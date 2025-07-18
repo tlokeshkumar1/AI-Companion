@@ -50,7 +50,11 @@ async def login(email: EmailStr = Body(...), password: str = Body(...)):
     if not user or not verify_password(password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    return {"message": "Login successful", "user_id": user["user_id"]}
+    return {
+        "message": "Login successful", 
+        "user_id": user["user_id"],
+        "full_name": user["full_name"]
+    }
 
 @router.post("/forgot-password")
 async def forgot_password(email: EmailStr = Body(...)):

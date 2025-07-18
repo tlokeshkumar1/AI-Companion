@@ -38,6 +38,13 @@ export default function BotCard({ bot, isOwner }: BotCardProps) {
             <img
               src={`http://localhost:8000/uploads/${bot.avatar}`}
               alt={bot.name}
+              onError={(e) => {
+                // If image fails to load, show the default avatar
+                const target = e.target as HTMLImageElement;
+                target.onerror = null;
+                target.src = '';
+                target.parentElement!.querySelector('svg')?.classList.remove('hidden');
+              }}
               className="w-16 h-16 rounded-full object-cover mr-4"
             />
           ) : (

@@ -45,7 +45,7 @@ async def create_bot(
         if avatar:
             os.makedirs("uploads", exist_ok=True)
             filename = f"{bot_id}_{avatar.filename}"
-            avatar_path = f"uploads/{filename}"
+            avatar_path = filename  # Store just the filename, not the full path
             with open(avatar_path, "wb") as f:
                 f.write(await avatar.read())
 
@@ -79,8 +79,9 @@ async def list_public_bots():
     public_bots = []
     for bot in bots:
         if bot.get("privacy") == "public":
-            if bot.get("avatar") and bot["avatar"].startswith("avatars/"):
-                bot["avatar"] = bot["avatar"].replace("avatars/", "", 1)
+            if bot.get("avatar"):
+                # Ensure the avatar path is just the filename
+                bot["avatar"] = bot["avatar"].replace("uploads/", "").replace("avatars/", "")
             public_bots.append(bot)
     return public_bots
 
@@ -90,8 +91,9 @@ async def list_my_bots(user_id: str):
     my_bots = []
     for bot in bots:
         if bot.get("user_id") == user_id:
-            if bot.get("avatar") and bot["avatar"].startswith("avatars/"):
-                bot["avatar"] = bot["avatar"].replace("avatars/", "", 1)
+            if bot.get("avatar"):
+                # Ensure the avatar path is just the filename
+                bot["avatar"] = bot["avatar"].replace("uploads/", "").replace("avatars/", "")
             my_bots.append(bot)
     return my_bots
 
@@ -101,7 +103,8 @@ async def get_bot(bot_id: str):
     for bot in bots:
         if bot.get("bot_id") == bot_id:
             # Fix avatar path if it starts with avatars/
-            if bot.get("avatar") and bot["avatar"].startswith("avatars/"):
-                bot["avatar"] = bot["avatar"].replace("avatars/", "", 1)
+            if bot.get("avatar"):
+                # Ensure the avatar path is just the filename
+                bot["avatar"] = bot["avatar"].replace("uploads/", "").replace("avatars/", "")
             return bot
     raise HTTPException(status_code=404, detail="Bot not found")

@@ -11,7 +11,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const userId = localStorage.getItem('user_id');
-  const fullName = localStorage.getItem('full_name');
+  const fullName = localStorage.getItem('user_name');
 
   useEffect(() => {
     if (!userId) {
