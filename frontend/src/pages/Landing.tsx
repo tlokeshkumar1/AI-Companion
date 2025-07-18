@@ -4,8 +4,17 @@ import { useEffect, useState } from 'react';
 import { Bot, MessageCircle, Users, Sparkles } from 'lucide-react';
 import { getPublicBots } from '../services/api';
 
+type BotType = {
+  bot_id: string;
+  name: string;
+  type_of_bot: string;
+  bio: string;
+  avatar: string | null;
+  privacy: string;
+};
+
 export default function Landing() {
-  const [featuredBots, setFeaturedBots] = useState<any[]>([]);
+  const [featuredBots, setFeaturedBots] = useState<BotType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fallback sample bots if no real bots exist
@@ -61,19 +70,11 @@ export default function Landing() {
     }
   };
 
-  const getAvatarUrl = (bot: any) => {
+  const getAvatarUrl = (bot: BotType) => {
     if (bot.avatar) {
-      return `http://localhost:8000/${bot.avatar}`;
+      return `http://localhost:8000/uploads/${bot.avatar}`;
     }
-    // Return a default avatar based on bot type or use a placeholder
-    const avatarMap: { [key: string]: string } = {
-      'Counselor': 'https://images.pexels.com/photos/5214413/pexels-photo-5214413.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'Developer': 'https://images.pexels.com/photos/2182970/pexels-photo-2182970.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'Family': 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'Teacher': 'https://images.pexels.com/photos/1181519/pexels-photo-1181519.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'Friend': 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
-    };
-    return avatarMap[bot.type_of_bot] || 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop';
+    return null;
   };
 
   return (
@@ -90,17 +91,19 @@ export default function Landing() {
             coding mentor, therapist, or any character you can imagine.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link 
-              to="/signup" 
-              className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg text-lg font-semibold"
-            >
-              Get Started Free
-            </Link>
+            {!localStorage.getItem('user_id') && (
+              <Link 
+                to="/signup" 
+                className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg text-lg font-semibold"
+              >
+                Get Started Free
+              </Link>
+            )}
             <Link 
               to="/dashboard" 
-              className="px-8 py-3 bg-white text-blue-600 border-2 border-blue-600 rounded-lg hover:bg-blue-50 transition-colors text-lg font-semibold"
+              className={`px-8 py-3 ${localStorage.getItem('user_id') ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white text-blue-600 border-2 border-blue-600 hover:bg-blue-50'} rounded-lg transition-colors shadow-lg text-lg font-semibold`}
             >
-              Explore Bots
+              {localStorage.getItem('user_id') ? 'Go to Dashboard' : 'Explore Bots'}
             </Link>
           </div>
         </div>
@@ -158,11 +161,17 @@ export default function Landing() {
             {featuredBots.map((bot) => (
               <div key={bot.bot_id} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow p-6 border border-slate-200">
                 <div className="flex items-center mb-4">
-                  <img 
-                    src={getAvatarUrl(bot)} 
-                    alt={bot.name}
-                    className="w-16 h-16 rounded-full object-cover mr-4"
-                  />
+                  {getAvatarUrl(bot) ? (
+                    <img 
+                      src={getAvatarUrl(bot) as string} 
+                      alt={bot.name}
+                      className="w-16 h-16 rounded-full object-cover mr-4"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mr-4">
+                      <Bot className="h-8 w-8 text-white" />
+                    </div>
+                  )}
                   <div>
                     <h3 className="text-xl font-semibold text-slate-900">{bot.name}</h3>
                     <p className="text-blue-600 font-medium">{bot.type_of_bot}</p>
