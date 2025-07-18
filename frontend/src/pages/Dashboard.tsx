@@ -143,13 +143,21 @@ export default function Dashboard() {
                   className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
                     selectedChat === chat.bot_id ? 'bg-blue-50' : ''
                   }`}
-                  onClick={() => setSelectedChat(chat.bot_id)}
+                  onClick={() => {
+                    setSelectedChat(chat.bot_id);
+                    navigate(`/chat/${chat.bot_id}`);
+                  }}
                 >
                   <div className="flex items-center space-x-3">
                     <img 
-                      src={chat.bot_avatar || defaultAvatar} 
+                      src={chat.bot_avatar ? `http://localhost:8000/uploads/${chat.bot_avatar}` : defaultAvatar} 
                       alt={chat.bot_name}
                       className="h-10 w-10 rounded-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = defaultAvatar;
+                      }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
