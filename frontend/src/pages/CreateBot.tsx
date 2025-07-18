@@ -7,6 +7,7 @@ export default function CreateBot() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
   const isEditing = Boolean(editId);
+  const [botId, setBotId] = useState<string | null>(editId);
   
   const [form, setForm] = useState({
     name: '',
@@ -114,8 +115,8 @@ export default function CreateBot() {
     if (avatar) formData.append('avatar', avatar);
 
     try {
-      if (isEditing) {
-        await updateBot(editId!, formData);
+      if (isEditing && editId) {
+        await updateBot(editId, formData);
         setMessage('Bot updated successfully!');
       } else {
         await createBot(formData);
@@ -123,6 +124,7 @@ export default function CreateBot() {
       }
       setTimeout(() => navigate('/dashboard'), 2000);
     } catch (error) {
+      console.error('Error saving bot:', error);
       setMessage('Failed to save bot. Please try again.');
     } finally {
       setIsLoading(false);

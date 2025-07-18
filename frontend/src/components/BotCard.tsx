@@ -26,7 +26,8 @@ export default function BotCard({ bot, isOwner }: BotCardProps) {
 
   const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigate(`/create-bot?edit=${bot.bot_id}`);
+    // Navigate to the edit page with the bot's ID
+    navigate(`/createbot?edit=${bot.bot_id}`, { state: { botId: bot.bot_id } });
   };
 
   return (

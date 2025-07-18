@@ -95,6 +95,71 @@ async def list_my_bots(user_id: str):
             my_bots.append(bot)
     return my_bots
 
+@router.put("/{bot_id}")
+async def update_bot(
+    bot_id: str,
+    user_id: str = Form(...),
+    name: str = Form(...),
+    bio: str = Form(...),
+    first_message: str = Form(...),
+    situation: str = Form(...),
+    back_story: str = Form(...),
+    personality: str = Form(...),
+    chatting_way: str = Form(...),
+    type_of_bot: str = Form(...),
+    privacy: str = Form(...),
+    avatar: UploadFile = File(None)
+):
+    try:
+        bots = load_bots()
+        bot_index = next((i for i, b in enumerate(bots) if b["bot_id"] == bot_id), None)
+        
+        if bot_index is None:
+            raise HTTPException(status_code=404, detail="Bot not found")
+            
+        # Only the owner can update the bot
+        if bots[bot_index].get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to update this bot")
+            
+        # Update bot data
+        updated_bot = {
+            **bots[bot_index],  # Keep existing fields
+            "name": name,
+            "bio": bio,
+            "first_message": first_message,
+            "situation": situation,
+            "back_story": back_story,
+            "personality": personality,
+            "chatting_way": chatting_way,
+            "type_of_bot": type_of_bot,
+            "privacy": privacy,
+        }
+        
+        # Handle avatar update if provided
+        if avatar:
+            # Remove old avatar if it exists
+            old_avatar = bots[bot_index].get("avatar")
+            if old_avatar and os.path.exists(old_avatar):
+                os.remove(old_avatar)
+                
+            # Save new avatar
+            os.makedirs("uploads", exist_ok=True)
+            filename = f"{bot_id}_{avatar.filename}"
+            avatar_path = f"uploads/{filename}"
+            with open(avatar_path, "wb") as f:
+                f.write(await avatar.read())
+            updated_bot["avatar"] = avatar_path
+        
+        # Update the bot in the list
+        bots[bot_index] = updated_bot
+        save_bots(bots)
+        
+        return {"message": "Bot updated successfully", "bot_id": bot_id}
+        
+    except Exception as e:
+        print(f"❌ Error in update_bot: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error updating bot: {str(e)}")
+
 @router.get("/{bot_id}")
 async def get_bot(bot_id: str):
     bots = load_bots()
