@@ -17,8 +17,42 @@ export const signupUser = (data: {
   confirm_password: string;
 }) => API.post('/auth/signup', data);
 
+export const verifyEmail = (data: {
+  email: string;
+  otp: string | number; // Accept both string and number for flexibility
+}) => API.post('/auth/email-verification', {
+  ...data,
+  otp: String(data.otp) // Ensure OTP is sent as string
+});
+
 export const loginUser = (data: { email: string; password: string }) =>
   API.post('/auth/login', data);
+
+export const requestPasswordReset = (email: string) =>
+  API.post('/auth/forgot-password/request', email, {
+    headers: {
+      'Content-Type': 'text/plain'
+    }
+  });
+
+export interface VerifyPasswordResetPayload {
+  email: string;
+  otp: string;
+  new_password?: string;
+}
+
+export const verifyPasswordResetOTP = (email: string, otp: string, newPassword?: string) => {
+  const payload: VerifyPasswordResetPayload = { 
+    email, 
+    otp: String(otp) // Ensure OTP is string
+  };
+  
+  if (newPassword) {
+    payload.new_password = newPassword;
+  }
+  
+  return API.post('/auth/forgot-password/verify', payload);
+};
 
 // ======================
 // Bot Endpoints
