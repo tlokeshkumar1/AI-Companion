@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Send, RotateCcw, Trash2, ArrowLeft, Bot, User } from 'lucide-react';
-import axios from 'axios';
+// Axios is used by the API service
 import { sendMessage, getChatHistory, getBotById, deleteChatHistory } from '../services/api';
 
 interface ChatMessage {
@@ -27,6 +27,8 @@ export default function ChatPage() {
   const [bot, setBot] = useState<Bot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  // isLoading is used in the loading state check
+  // setIsLoading is used in the fetchData function
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const userId = localStorage.getItem('user_id');
 
@@ -41,15 +43,54 @@ export default function ChatPage() {
       }
       if (botId && isMounted) {
         try {
-          await loadBotData(controller.signal);
-          await loadChatHistory(controller.signal);
+          setIsLoading(true);
+          // Load bot data first
+          const botResponse = await getBotById(botId, controller.signal);
+          if (!isMounted) return;
+          
+          // Update bot state
+          setBot(botResponse.data);
+          
+          // Then load chat history
+          const historyResponse = await getChatHistory(userId, botId, controller.signal);
+          if (!isMounted) return;
+          
+          if (historyResponse.status === 'success') {
+            // If no chat history, add the bot's first message
+            if (Array.isArray(historyResponse.data) && historyResponse.data.length === 0) {
+              const welcomeMessage: ChatMessage = {
+                id: 'welcome-' + Date.now(),
+                message: '',
+                response: botResponse.data.first_message || 'Hello! How can I help you today?',
+                timestamp: new Date().toISOString()
+              };
+              setChat([welcomeMessage]);
+            } else if (Array.isArray(historyResponse.data)) {
+              setChat(historyResponse.data);
+            }
+          }
         } catch (error: unknown) {
           if (error instanceof Error) {
-            if (error.name !== 'AbortError') {
+            // Ignore AbortError as it's expected during component unmount
+            if (error.name !== 'AbortError' && error.name !== 'CanceledError') {
               console.error('Error in fetchData:', error);
+              // If there's an error but we have bot data, show the first message
+              if (bot) {
+                const welcomeMessage: ChatMessage = {
+                  id: 'welcome-' + Date.now(),
+                  message: '',
+                  response: bot.first_message || 'Hello! How can I help you today?',
+                  timestamp: new Date().toISOString()
+                };
+                setChat(prev => [...prev, welcomeMessage]);
+              }
             }
           } else {
             console.error('An unknown error occurred in fetchData');
+          }
+        } finally {
+          if (isMounted) {
+            setIsLoading(false);
           }
         }
       }
@@ -71,41 +112,7 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const loadBotData = async (signal?: AbortSignal) => {
-    try {
-      const response = await getBotById(botId!, signal);
-      if (signal?.aborted) return;
-      console.log('Bot data loaded:', response.data);
-      setBot(response.data);
-    } catch (error: unknown) {
-      // Ignore cancellation errors
-      if (axios.isCancel(error) || (error instanceof Error && error.name === 'CanceledError')) {
-        return;
-      }
-      console.error('Error loading bot data:', error);
-    }
-  };
 
-  const loadChatHistory = async (signal?: AbortSignal) => {
-    setIsLoading(true);
-    try {
-      const response = await getChatHistory(userId!, botId!, signal);
-      if (signal?.aborted) return;
-      if (response.status === 'success' && Array.isArray(response.data)) {
-        setChat(response.data);
-      }
-    } catch (error: unknown) {
-      // Ignore cancellation errors
-      if (axios.isCancel(error) || (error instanceof Error && error.name === 'CanceledError')) {
-        return;
-      }
-      console.error('Error loading chat history:', error);
-    } finally {
-      if (!signal?.aborted) {
-        setIsLoading(false);
-      }
-    }
-  };
 
   const handleSend = async () => {
     if (!input.trim() || isSending || !userId || !botId) return;
@@ -114,6 +121,19 @@ export default function ChatPage() {
     setInput('');
     setIsSending(true);
 
+    // Create a temporary message ID for the user's message
+    const messageId = Date.now().toString();
+    
+    // Add user message immediately
+    const newMessage: ChatMessage = {
+      id: messageId,
+      message: userMessage,
+      response: '...', // Temporary loading response
+      timestamp: new Date().toISOString()
+    };
+    
+    setChat((prev: ChatMessage[]) => [...prev, newMessage]);
+
     try {
       const response = await sendMessage({ 
         user_id: userId, 
@@ -121,22 +141,38 @@ export default function ChatPage() {
         message: userMessage 
       });
       
-      const newMessage: ChatMessage = {
-        id: Date.now().toString(),
-        message: userMessage,
-        response: response.data.response,
-        timestamp: new Date().toISOString()
-      };
-      
-      setChat(prev => [...prev, newMessage]);
+      // Update the message with the bot's response
+      setChat((prev: ChatMessage[]) => 
+        prev.map((msg: ChatMessage) => 
+          msg.id === messageId
+            ? {
+                ...msg,
+                response: response.data.response || "I apologize, but I'm having trouble processing your request.",
+                timestamp: new Date().toISOString()
+              }
+            : msg
+        )
+      );
     } catch (error) {
       console.error('Error sending message:', error);
+      // Update with error message
+      setChat((prev: ChatMessage[]) => 
+        prev.map((msg: ChatMessage) => 
+          msg.id === messageId
+            ? {
+                ...msg,
+                response: 'Sorry, there was an error processing your message. Please try again.',
+                timestamp: new Date().toISOString()
+              }
+            : msg
+        )
+      );
     } finally {
       setIsSending(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -144,9 +180,11 @@ export default function ChatPage() {
   };
 
   const handleDeleteChat = async () => {
+    if (!userId || !botId) return;
+    
     if (window.confirm('Are you sure you want to delete this chat history?')) {
       try {
-        await deleteChatHistory(userId!, botId!);
+        await deleteChatHistory(userId, botId);
         setChat([]);
       } catch (error) {
         console.error('Error deleting chat:', error);
@@ -155,7 +193,7 @@ export default function ChatPage() {
   };
 
   const handleRestartChat = () => {
-    if (window.confirm('Are you sure you want to restart this chat?')) {
+    if (window.confirm('Are you sure you want to restart this chat? This will delete all messages.')) {
       handleDeleteChat();
     }
   };
@@ -230,111 +268,83 @@ export default function ChatPage() {
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {chat.length === 0 && bot?.first_message && (
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              {bot.avatar ? (
-                <img
-                  src={bot.avatar.startsWith('http') ? bot.avatar : `http://localhost:8000/uploads/${bot.avatar}`}
-                  alt={bot.name}
-                  className="w-8 h-8 rounded-full object-cover"
-                  onError={(e) => {
-                    console.error('Error loading avatar:', bot.avatar);
-                    // Fallback to default avatar if image fails to load
-                    e.currentTarget.style.display = 'none';
-                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                  }}
-                />
-              ) : (
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <Bot className="h-4 w-4 text-white" />
-                </div>
-              )}
-            </div>
-            <div className="flex-1">
-              <div className="bg-slate-100 rounded-lg p-4 max-w-md">
-                <p className="text-slate-800">{bot.first_message}</p>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">Just now</p>
-            </div>
-          </div>
-        )}
+        {/* Removed separate welcome message since it's now part of the chat */}
 
-        {chat.map((message) => (
-          <React.Fragment key={message.id}>
-            {/* User Message */}
-            <div className="flex items-start space-x-3 justify-end">
-              <div className="flex-1 text-right">
-                <div className="bg-blue-600 text-white rounded-lg p-4 max-w-md ml-auto">
-                  <p>{message.message}</p>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  {new Date(message.timestamp).toLocaleTimeString()}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                  <User className="h-4 w-4 text-white" />
-                </div>
-              </div>
-            </div>
-
-            {/* Bot Response */}
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0">
-                {bot?.avatar ? (
-                  <img
-                    src={`http://localhost:8000/${bot.avatar}`}
-                    alt={bot.name}
-                    className="w-8 h-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <Bot className="h-4 w-4 text-white" />
+        {chat.map((message, index) => (
+          <React.Fragment key={`message-${message.id}-${index}`}>
+            {/* User Message - Only show if there's a message */}
+            {message.message && (
+              <div className="flex items-start space-x-3 justify-end mb-4">
+                <div className="flex-1 text-right">
+                  <div className="bg-blue-600 text-white rounded-lg p-4 max-w-md ml-auto">
+                    <p>{message.message}</p>
                   </div>
-                )}
-              </div>
-              <div className="flex-1">
-                <div className="bg-slate-100 rounded-lg p-4 max-w-md">
-                  <p className="text-slate-800">{message.response}</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {new Date(message.timestamp).toLocaleTimeString()}
+                  </p>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  {new Date(message.timestamp).toLocaleTimeString()}
-                </p>
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                    <User className="h-4 w-4 text-white" />
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Bot Response - Only show if there's a response */}
+            {message.response && (
+              <div className="flex items-start space-x-3 mb-4">
+                <div className="flex-shrink-0">
+                  {bot?.avatar ? (
+                    <div className="relative">
+                      <img
+                        src={bot.avatar.startsWith('http') ? bot.avatar : `http://localhost:8000/uploads/${bot.avatar}`}
+                        alt={bot.name}
+                        className="w-8 h-8 rounded-full object-cover"
+                        onError={(e) => {
+                          console.error('Error loading avatar:', bot.avatar);
+                          const img = e.currentTarget;
+                          img.style.display = 'none';
+                          const fallback = img.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.classList.remove('hidden');
+                        }}
+                      />
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center hidden">
+                        <Bot className="h-4 w-4 text-white" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <Bot className="h-4 w-4 text-white" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="bg-slate-100 rounded-lg p-4 max-w-md">
+                    {message.response === '...' ? (
+                      <div className="flex items-center space-x-2">
+                        {[0, 1, 2].map((i) => (
+                          <div 
+                            key={`dot-${i}`}
+                            className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                            style={{ animationDelay: `${i * 0.1}s` }}
+                          ></div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-slate-800 whitespace-pre-wrap">{message.response}</p>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {new Date(message.timestamp).toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+            )}
           </React.Fragment>
         ))}
 
-        {isSending && (
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              {bot?.avatar ? (
-                <img
-                  src={`http://localhost:8000/${bot.avatar}`}
-                  alt={bot.name}
-                  className="w-8 h-8 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <Bot className="h-4 w-4 text-white" />
-                </div>
-              )}
-            </div>
-            <div className="flex-1">
-              <div className="bg-slate-100 rounded-lg p-4 max-w-md">
-                <div className="flex items-center space-x-2">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  </div>
-                  <span className="text-slate-500 text-sm">Typing...</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         <div ref={messagesEndRef} />
       </div>

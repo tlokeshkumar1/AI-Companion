@@ -16,6 +16,25 @@ type BotType = {
 export default function Landing() {
   const [featuredBots, setFeaturedBots] = useState<BotType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('user_id'));
+
+  // Listen for storage changes to update auth state
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setIsAuthenticated(!!localStorage.getItem('user_id'));
+    };
+
+    // Listen for storage events
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom event that we'll dispatch on logout
+    window.addEventListener('authChange', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('authChange', handleStorageChange);
+    };
+  }, []);
 
   // Fallback sample bots if no real bots exist
   const sampleBots = [
@@ -91,7 +110,7 @@ export default function Landing() {
             coding mentor, therapist, or any character you can imagine.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            {!localStorage.getItem('user_id') && (
+            {!isAuthenticated && (
               <Link 
                 to="/signup" 
                 className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg text-lg font-semibold"
@@ -100,10 +119,10 @@ export default function Landing() {
               </Link>
             )}
             <Link 
-              to="/dashboard" 
-              className={`px-8 py-3 ${localStorage.getItem('user_id') ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white text-blue-600 border-2 border-blue-600 hover:bg-blue-50'} rounded-lg transition-colors shadow-lg text-lg font-semibold`}
+              to={isAuthenticated ? "/dashboard" : "/dashboard"} 
+              className={`px-8 py-3 ${isAuthenticated ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white text-blue-600 border-2 border-blue-600 hover:bg-blue-50'} rounded-lg transition-colors shadow-lg text-lg font-semibold`}
             >
-              {localStorage.getItem('user_id') ? 'Go to Dashboard' : 'Explore Bots'}
+              {isAuthenticated ? 'Go to Dashboard' : 'Explore Bots'}
             </Link>
           </div>
         </div>

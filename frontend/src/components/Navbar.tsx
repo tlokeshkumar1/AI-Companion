@@ -8,6 +8,8 @@ export default function Navbar() {
 
   const handleLogout = () => {
     localStorage.removeItem('user_id');
+    // Dispatch custom event to notify other components about auth change
+    window.dispatchEvent(new Event('authChange'));
     navigate('/');
   };
 
