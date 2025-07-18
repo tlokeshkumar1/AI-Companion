@@ -46,11 +46,16 @@ export const getPublicBots = (signal?: AbortSignal) =>
 // ======================
 // Chat Endpoints
 // ======================
-export const sendMessage = (payload: {
+export interface SendMessagePayload {
   user_id: string;
   bot_id: string;
   message: string;
-}) => API.post('/chat/ask', payload);
+  is_system_message?: boolean;
+  response?: string;
+  message_id?: string;
+}
+
+export const sendMessage = (payload: SendMessagePayload) => API.post('/chat/ask', payload);
 
 export const getChatHistory = async (userId: string, botId: string, signal?: AbortSignal) => {
   try {

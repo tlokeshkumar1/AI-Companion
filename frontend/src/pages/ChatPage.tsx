@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Send, RotateCcw, Trash2, ArrowLeft, Bot, User } from 'lucide-react';
 // Axios is used by the API service
 import { sendMessage, getChatHistory, getBotById, deleteChatHistory } from '../services/api';
+import { v4 as uuidv4 } from 'uuid';
 
 interface ChatMessage {
   id: string;
@@ -62,14 +63,29 @@ export default function ChatPage() {
             // If no chat history, add the bot's first message
             if (Array.isArray(historyResponse.data) && historyResponse.data.length === 0) {
               console.log('No chat history, adding welcome message');
+              const welcomeResponse = botResponse.data.first_message || 'Hello! How can I help you today?';
               const welcomeMessage: ChatMessage = {
                 id: 'welcome-' + Date.now(),
                 message: '',
-                response: botResponse.data.first_message || 'Hello! How can I help you today?',
+                response: welcomeResponse,
                 timestamp: new Date().toISOString()
               };
               console.log('Setting welcome message:', welcomeMessage);
               setChat([welcomeMessage]);
+              
+              // Store the welcome message in the database
+              try {
+                await sendMessage({
+                  user_id: userId,
+                  bot_id: botId,
+                  message: '', // Empty message to indicate it's a system message
+                  is_system_message: true,
+                  response: welcomeResponse,
+                  message_id: uuidv4()
+                });
+              } catch (error) {
+                console.error('Failed to store welcome message:', error);
+              }
             } else if (Array.isArray(historyResponse.data)) {
               console.log('Setting chat history data:', historyResponse.data);
               // Ensure each message has the required fields

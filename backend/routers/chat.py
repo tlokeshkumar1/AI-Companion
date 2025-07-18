@@ -15,15 +15,33 @@ db = client["ai_companion"]
 async def ask(
     user_id: str = Body(...),
     bot_id: str = Body(...),
-    message: str = Body(...)
+    message: str = Body(...),
+    is_system_message: bool = Body(False),
+    response: str = Body(None),
+    message_id: str = Body(None)
 ):
     chat_id = f"{user_id}_{bot_id}"
-
+    
+    # If it's a system message (like bot's first message), store it directly
+    if is_system_message and response:
+        await db.chats.insert_one({
+            "chat_id": chat_id,
+            "user_id": user_id,
+            "bot_id": bot_id,
+            "message": message,  # Empty for system messages
+            "response": response,
+            "is_system_message": True,
+            "message_id": message_id or str(uuid.uuid4()),
+            "timestamp": datetime.utcnow()
+        })
+        return {"status": "success", "message": "System message stored"}
+    
+    # Normal user message flow
     with open("bots_data.json", "r") as f:
         bots = json.load(f)
     bot = next((b for b in bots if b["bot_id"] == bot_id), None)
     if not bot:
-        return {"error": "Bot not found"}
+        return {"status": "error", "message": "Bot not found"}
 
     response = await chat_with_bot(bot, message, chat_id)
 
@@ -33,10 +51,11 @@ async def ask(
         "bot_id": bot_id,
         "message": message,
         "response": response,
+        "message_id": message_id or str(uuid.uuid4()),
         "timestamp": datetime.utcnow()
     })
 
-    return {"response": response}
+    return {"status": "success", "response": response}
 
 @router.get("/history")
 async def get_chat_history(user_id: str, bot_id: str):
