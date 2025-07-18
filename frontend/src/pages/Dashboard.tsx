@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, MessageCircle, ChevronRight } from 'lucide-react';
+import { Plus, MessageCircle, ChevronRight, Menu, X } from 'lucide-react';
 import { getMyBots, getPublicBots, getChatHistory } from '../services/api';
 import BotCard from '../components/BotCard';
 import { Bot, ChatMessage, ChatHistoryItem } from '../types';
+import { useMediaQuery } from 'react-responsive';
 
 // Default avatar as base64 to avoid file dependency
 const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9Ii5ub25zY3JpcHQgY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTIwIDIxdi0yYTQgNCAwIDAgMC00LTRIOGE0IDQgMCAwIDAtNCA0djIiPjwvcGF0aD48Y2lyY2xlIGN4PSIxMiIgY3k9IjciIHI9IjQiPjwvY2lyY2xlPjwvc3ZnPg==';
@@ -16,9 +17,13 @@ export default function Dashboard() {
   const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const userId = localStorage.getItem('user_id');
   const fullName = localStorage.getItem('user_name');
+  
+  // Responsive breakpoints
+  const isMobile = useMediaQuery({ maxWidth: 767 });
 
   useEffect(() => {
     if (!userId) {
@@ -123,12 +128,42 @@ export default function Dashboard() {
     return `${Math.floor(diffInSeconds / 86400)}d ago`;
   };
 
+  // Toggle sidebar on mobile
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  // Close sidebar when clicking on a chat on mobile
+  const handleChatClick = (botId: string) => {
+    setSelectedChat(botId);
+    navigate(`/chat/${botId}`);
+    if (isMobile) {
+      setIsSidebarOpen(false);
+    }
+  };
+
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* Mobile sidebar overlay */}
+      {isMobile && isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-20"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+      
       {/* Sidebar */}
-      <div className="w-80 border-r border-gray-200 bg-white flex flex-col">
-        <div className="p-4 border-b border-gray-200">
+      <div 
+        className={`fixed md:relative z-30 md:z-0 w-72 md:w-80 h-full bg-white border-r border-gray-200 flex flex-col transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out`}
+      >
+        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-gray-800">Chat History</h2>
+          <button 
+            onClick={toggleSidebar}
+            className="md:hidden p-1 rounded-md text-gray-500 hover:bg-gray-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
         <div className="flex-1 overflow-y-auto">
           {isLoadingHistory ? (
@@ -140,13 +175,10 @@ export default function Dashboard() {
               {chatHistory.map((chat) => (
                 <div 
                   key={chat.bot_id}
-                  className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
+                  className={`p-3 md:p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
                     selectedChat === chat.bot_id ? 'bg-blue-50' : ''
                   }`}
-                  onClick={() => {
-                    setSelectedChat(chat.bot_id);
-                    navigate(`/chat/${chat.bot_id}`);
-                  }}
+                  onClick={() => handleChatClick(chat.bot_id)}
                 >
                   <div className="flex items-center space-x-3">
                     <img 
@@ -190,28 +222,53 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 flex flex-col overflow-hidden w-full">
+        {/* Mobile header */}
+        <div className="md:hidden p-4 border-b border-gray-200 bg-white flex items-center justify-between">
+          <button 
+            onClick={toggleSidebar}
+            className="p-2 rounded-md text-gray-500 hover:bg-gray-100"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <h1 className="text-lg font-semibold text-slate-900">Dashboard</h1>
+          <div className="w-8"></div> {/* Spacer for alignment */}
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-4 md:p-6">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">
-                Welcome back, {fullName}
-              </h1>
-              <p className="mt-2 text-slate-600">Manage your AI companions and discover new ones</p>
+          <div className="hidden md:block mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold text-slate-900">
+                  Welcome back, {fullName}
+                </h1>
+                <p className="mt-1 md:mt-2 text-slate-600 text-sm md:text-base">
+                  Manage your AI companions and discover new ones
+                </p>
+              </div>
+              <Link
+                to="/createbot"
+                className="hidden sm:inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md text-sm md:text-base"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Bot
+              </Link>
             </div>
+            
+            {/* Mobile create button */}
             <Link
               to="/createbot"
-              className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md"
+              className="md:hidden fixed bottom-6 right-6 z-10 flex items-center justify-center w-14 h-14 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-colors"
+              aria-label="Create New Bot"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Create New Bot
+              <Plus className="h-6 w-6" />
             </Link>
           </div>
 
           {/* Tabs */}
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          <div className="border-b border-gray-200 overflow-x-auto">
+            <nav className="-mb-px flex space-x-4 md:space-x-8 whitespace-nowrap" aria-label="Tabs">
               <button
                 onClick={() => setActiveTab('my-bots')}
                 className={`${activeTab === 'my-bots' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
@@ -234,9 +291,9 @@ export default function Dashboard() {
           </div>
 
           {/* Bots List */}
-          <div className="mt-6">
+          <div className="mt-4 md:mt-6">
             {activeTab === 'my-bots' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
                 {myBots.length > 0 ? (
                   myBots.map((bot) => (
                     <BotCard key={bot.bot_id} bot={bot} isOwner={true} onUpdate={loadBots} />

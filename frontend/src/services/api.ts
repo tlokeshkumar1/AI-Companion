@@ -121,7 +121,7 @@ export const getChatHistory = async (userId: string, botId: string, signal?: Abo
   }
 };
 
-export const deleteChatHistory = (userId: string, botId: string) =>
+export const restartChat = (userId: string, botId: string) =>
   API.delete(`/chat/restart?user_id=${userId}&bot_id=${botId}`);
 
 export default API;

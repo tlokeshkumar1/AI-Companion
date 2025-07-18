@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, RotateCcw, Trash2, ArrowLeft, Bot, User } from 'lucide-react';
+import { Send, RotateCcw, ArrowLeft, Bot, User } from 'lucide-react';
 // Axios is used by the API service
-import { sendMessage, getChatHistory, getBotById, deleteChatHistory } from '../services/api';
+import { sendMessage, getChatHistory, getBotById, restartChat } from '../services/api';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ChatMessage {
@@ -209,22 +209,44 @@ export default function ChatPage() {
     }
   };
 
-  const handleDeleteChat = async () => {
+  const handleRestartChat = async () => {
     if (!userId || !botId) return;
     
-    if (window.confirm('Are you sure you want to delete this chat history?')) {
+    if (window.confirm('Are you sure you want to restart this chat? This will clear all messages and start fresh.')) {
       try {
-        await deleteChatHistory(userId, botId);
+        // Clear the current chat
         setChat([]);
+        
+        // Call the restart chat endpoint
+        await restartChat(userId, botId);
+        
+        // Get the bot's first message and set it as the initial message
+        if (bot) {
+          const welcomeMessage: ChatMessage = {
+            id: 'welcome-' + Date.now(),
+            message: '',
+            response: bot.first_message || 'Hello! How can I help you today?',
+            timestamp: new Date().toISOString()
+          };
+          setChat([welcomeMessage]);
+          
+          // Store the welcome message in the database
+          try {
+            await sendMessage({
+              user_id: userId,
+              bot_id: botId,
+              message: '', // Empty message to indicate it's a system message
+              is_system_message: true,
+              response: welcomeMessage.response,
+              message_id: uuidv4()
+            });
+          } catch (error) {
+            console.error('Failed to store welcome message:', error);
+          }
+        }
       } catch (error) {
-        console.error('Error deleting chat:', error);
+        console.error('Error restarting chat:', error);
       }
-    }
-  };
-
-  const handleRestartChat = () => {
-    if (window.confirm('Are you sure you want to restart this chat? This will delete all messages.')) {
-      handleDeleteChat();
     }
   };
 
@@ -285,13 +307,6 @@ export default function ChatPage() {
             title="Restart Chat"
           >
             <RotateCcw className="h-5 w-5" />
-          </button>
-          <button
-            onClick={handleDeleteChat}
-            className="p-2 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            title="Delete Chat"
-          >
-            <Trash2 className="h-5 w-5" />
           </button>
         </div>
       </div>

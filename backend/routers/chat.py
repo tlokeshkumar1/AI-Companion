@@ -77,5 +77,26 @@ async def get_chat_history(user_id: str, bot_id: str):
 
 @router.delete("/restart")
 async def restart_chat(user_id: str, bot_id: str):
-    chat_id = f"{user_id}_{bot_id}"
-    await db.chats.delete_many({"chat_id": chat_id})
+    try:
+        chat_id = f"{user_id}_{bot_id}"
+        # Print debug info
+        print(f"Attempting to delete chat history for chat_id: {chat_id}")
+        
+        # Delete all messages for this chat
+        result = await db.chats.delete_many({"chat_id": chat_id})
+        
+        # Log the result
+        print(f"Deleted {result.deleted_count} messages for chat_id: {chat_id}")
+        
+        # Return success response with count of deleted messages
+        return {
+            "status": "success",
+            "message": "Chat history cleared successfully",
+            "deleted_count": result.deleted_count
+        }
+    except Exception as e:
+        print(f"Error in restart_chat: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to clear chat history: {str(e)}"
+        )
