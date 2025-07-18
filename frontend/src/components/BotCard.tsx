@@ -15,6 +15,7 @@ interface Bot {
 interface BotCardProps {
   bot: Bot;
   isOwner: boolean;
+  onUpdate?: () => Promise<void>;
 }
 
 export default function BotCard({ bot, isOwner }: BotCardProps) {

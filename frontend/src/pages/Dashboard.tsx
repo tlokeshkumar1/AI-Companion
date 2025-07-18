@@ -1,14 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, MessageCircle, Settings, Globe, Lock } from 'lucide-react';
-import { getMyBots, getPublicBots } from '../services/api';
+import { Plus, MessageCircle, ChevronRight } from 'lucide-react';
+import { getMyBots, getPublicBots, getChatHistory } from '../services/api';
 import BotCard from '../components/BotCard';
+import { Bot, ChatMessage, ChatHistoryItem } from '../types';
+
+// Default avatar as base64 to avoid file dependency
+const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9Ii5ub25zY3JpcHQgY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTIwIDIxdi0yYTQgNCAwIDAgMC00LTRIOGE0IDQgMCAwIDAtNCA0djIiPjwvcGF0aD48Y2lyY2xlIGN4PSIxMiIgY3k9IjciIHI9IjQiPjwvY2lyY2xlPjwvc3ZnPg==';
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState('my-bots');
-  const [myBots, setMyBots] = useState([]);
-  const [publicBots, setPublicBots] = useState([]);
+  const [activeTab, setActiveTab] = useState<'my-bots' | 'public-bots'>('my-bots');
+  const [myBots, setMyBots] = useState<Bot[]>([]);
+  const [publicBots, setPublicBots] = useState<Bot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const navigate = useNavigate();
   const userId = localStorage.getItem('user_id');
   const fullName = localStorage.getItem('user_name');
@@ -36,6 +43,64 @@ export default function Dashboard() {
     }
   };
 
+  const loadChatHistory = useCallback(async () => {
+    if (!userId) return;
+    
+    setIsLoadingHistory(true);
+    try {
+      // Get all unique bot IDs from both myBots and publicBots
+      const allBots = [...myBots, ...publicBots];
+      const uniqueBotIds = Array.from(new Set(allBots.map(bot => bot.bot_id)));
+      
+      // Fetch chat history for each bot in parallel
+      const historyPromises = uniqueBotIds.map(async (botId) => {
+        try {
+          const response = await getChatHistory(userId, botId);
+          if (response.data && response.data.length > 0) {
+            const bot = allBots.find(b => b.bot_id === botId);
+            const lastMessage: ChatMessage = response.data[response.data.length - 1];
+            return {
+              bot_id: botId,
+              bot_name: bot?.name || 'Unknown Bot',
+              bot_avatar: bot?.avatar,
+              last_message: lastMessage.message || lastMessage.response || '',
+              timestamp: lastMessage.timestamp
+            };
+          }
+          return null;
+        } catch (error) {
+          console.error(`Error loading history for bot ${botId}:`, error);
+          return null;
+        }
+      });
+      
+      const historyResults = await Promise.all(historyPromises);
+      const validHistory: ChatHistoryItem[] = [];
+      historyResults.forEach(item => {
+        if (item !== null) {
+          validHistory.push({
+            bot_id: item.bot_id,
+            bot_name: item.bot_name,
+            bot_avatar: item.bot_avatar,
+            last_message: item.last_message,
+            timestamp: item.timestamp
+          });
+        }
+      });
+      setChatHistory(validHistory);
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, [userId, myBots, publicBots]);
+
+  useEffect(() => {
+    if (myBots.length > 0 || publicBots.length > 0) {
+      loadChatHistory();
+    }
+  }, [loadChatHistory, myBots, publicBots]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -47,98 +112,156 @@ export default function Dashboard() {
     );
   }
 
+  const formatTimeAgo = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    return `${Math.floor(diffInSeconds / 86400)}d ago`;
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">
-            Welcome back, {fullName}
-          </h1>
-          <p className="mt-2 text-slate-600">Manage your AI companions and discover new ones</p>
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <div className="w-80 border-r border-gray-200 bg-white flex flex-col">
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-800">Chat History</h2>
         </div>
-        <Link
-          to="/createbot"
-          className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create New Bot
-        </Link>
+        <div className="flex-1 overflow-y-auto">
+          {isLoadingHistory ? (
+            <div className="flex items-center justify-center p-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            </div>
+          ) : chatHistory.length > 0 ? (
+            <div className="divide-y divide-gray-100">
+              {chatHistory.map((chat) => (
+                <div 
+                  key={chat.bot_id}
+                  className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
+                    selectedChat === chat.bot_id ? 'bg-blue-50' : ''
+                  }`}
+                  onClick={() => setSelectedChat(chat.bot_id)}
+                >
+                  <div className="flex items-center space-x-3">
+                    <img 
+                      src={chat.bot_avatar || defaultAvatar} 
+                      alt={chat.bot_name}
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <h3 className="text-sm font-medium text-gray-900 truncate">
+                          {chat.bot_name}
+                        </h3>
+                        <span className="text-xs text-gray-500">
+                          {formatTimeAgo(chat.timestamp)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-500 truncate mt-1">
+                        {chat.last_message.length > 50 
+                          ? `${chat.last_message.substring(0, 50)}...` 
+                          : chat.last_message}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-4 text-center text-gray-500">
+              <MessageCircle className="h-8 w-8 mx-auto text-gray-300 mb-2" />
+              <p>No chat history yet</p>
+              <p className="text-sm mt-1">Start a new conversation to see it here</p>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-slate-200 mb-8">
-        <nav className="-mb-px flex space-x-8">
-          <button
-            onClick={() => setActiveTab('my-bots')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'my-bots'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-            }`}
-          >
-            <Lock className="h-4 w-4 inline mr-1" />
-            My Bots ({myBots.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('public-bots')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'public-bots'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-            }`}
-          >
-            <Globe className="h-4 w-4 inline mr-1" />
-            Public Bots ({publicBots.length})
-          </button>
-        </nav>
-      </div>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">
+                Welcome back, {fullName}
+              </h1>
+              <p className="mt-2 text-slate-600">Manage your AI companions and discover new ones</p>
+            </div>
+            <Link
+              to="/createbot"
+              className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create New Bot
+            </Link>
+          </div>
 
-      {/* Content */}
-      {activeTab === 'my-bots' ? (
-        <div>
-          {myBots.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <MessageCircle className="h-8 w-8 text-slate-400" />
-              </div>
-              <h3 className="text-lg font-medium text-slate-900 mb-2">No bots yet</h3>
-              <p className="text-slate-600 mb-4">Create your first AI companion to get started</p>
-              <Link
-                to="/createbot"
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          {/* Tabs */}
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('my-bots')}
+                className={`${activeTab === 'my-bots' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Your First Bot
-              </Link>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {myBots.map((bot: any) => (
-                <BotCard key={bot.bot_id} bot={bot} isOwner={true} />
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div>
-          {publicBots.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Globe className="h-8 w-8 text-slate-400" />
+                My Bots
+                <span className="bg-gray-100 text-gray-600 ml-2 py-0.5 px-2 rounded-full text-xs font-medium">
+                  {myBots.length}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab('public-bots')}
+                className={`${activeTab === 'public-bots' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                Public Bots
+                <span className="bg-gray-100 text-gray-600 ml-2 py-0.5 px-2 rounded-full text-xs font-medium">
+                  {publicBots.length}
+                </span>
+              </button>
+            </nav>
+          </div>
+
+          {/* Bots List */}
+          <div className="mt-6">
+            {activeTab === 'my-bots' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {myBots.length > 0 ? (
+                  myBots.map((bot) => (
+                    <BotCard key={bot.bot_id} bot={bot} isOwner={true} onUpdate={loadBots} />
+                  ))
+                ) : (
+                  <div className="col-span-3 text-center py-10">
+                    <p className="text-gray-500">You haven't created any bots yet.</p>
+                    <Link
+                      to="/createbot"
+                      className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      <Plus className="-ml-1 mr-2 h-5 w-5" />
+                      Create Your First Bot
+                    </Link>
+                  </div>
+                )}
               </div>
-              <h3 className="text-lg font-medium text-slate-900 mb-2">No public bots available</h3>
-              <p className="text-slate-600">Be the first to create a public bot for the community!</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {publicBots.map((bot: any) => (
-                <BotCard key={bot.bot_id} bot={bot} isOwner={false} />
-              ))}
-            </div>
-          )}
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {publicBots.length > 0 ? (
+                  publicBots.map((bot) => (
+                    <BotCard key={bot.bot_id} bot={bot} isOwner={false} onUpdate={loadBots} />
+                  ))
+                ) : (
+                  <div className="col-span-3 text-center py-10">
+                    <p className="text-gray-500">No public bots available.</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
