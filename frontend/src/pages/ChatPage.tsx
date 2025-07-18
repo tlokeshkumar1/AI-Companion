@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Send, RotateCcw, Trash2, ArrowLeft, Bot, User } from 'lucide-react';
+import axios from 'axios';
 import { sendMessage, getChatHistory, getBotById, deleteChatHistory } from '../services/api';
 
 interface ChatMessage {
@@ -30,14 +31,36 @@ export default function ChatPage() {
   const userId = localStorage.getItem('user_id');
 
   useEffect(() => {
-    if (!userId) {
-      navigate('/login');
-      return;
-    }
-    if (botId) {
-      loadBotData();
-      loadChatHistory();
-    }
+    const controller = new AbortController();
+    let isMounted = true;
+
+    const fetchData = async () => {
+      if (!userId) {
+        navigate('/login');
+        return;
+      }
+      if (botId && isMounted) {
+        try {
+          await loadBotData(controller.signal);
+          await loadChatHistory(controller.signal);
+        } catch (error: unknown) {
+          if (error instanceof Error) {
+            if (error.name !== 'AbortError') {
+              console.error('Error in fetchData:', error);
+            }
+          } else {
+            console.error('An unknown error occurred in fetchData');
+          }
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, [userId, botId, navigate]);
 
   useEffect(() => {
@@ -48,28 +71,39 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const loadBotData = async () => {
+  const loadBotData = async (signal?: AbortSignal) => {
     try {
-      const response = await getBotById(botId!);
+      const response = await getBotById(botId!, signal);
+      if (signal?.aborted) return;
       console.log('Bot data loaded:', response.data);
-      console.log('Avatar path:', response.data.avatar);
       setBot(response.data);
-    } catch (error) {
+    } catch (error: unknown) {
+      // Ignore cancellation errors
+      if (axios.isCancel(error) || (error instanceof Error && error.name === 'CanceledError')) {
+        return;
+      }
       console.error('Error loading bot data:', error);
     }
   };
 
-  const loadChatHistory = async () => {
+  const loadChatHistory = async (signal?: AbortSignal) => {
     setIsLoading(true);
     try {
-      const response = await getChatHistory(userId!, botId!);
+      const response = await getChatHistory(userId!, botId!, signal);
+      if (signal?.aborted) return;
       if (response.status === 'success' && Array.isArray(response.data)) {
         setChat(response.data);
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      // Ignore cancellation errors
+      if (axios.isCancel(error) || (error instanceof Error && error.name === 'CanceledError')) {
+        return;
+      }
       console.error('Error loading chat history:', error);
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -227,7 +261,7 @@ export default function ChatPage() {
         )}
 
         {chat.map((message) => (
-          <div key={message.id} className="space-y-4">
+          <React.Fragment key={message.id}>
             {/* User Message */}
             <div className="flex items-start space-x-3 justify-end">
               <div className="flex-1 text-right">
@@ -269,7 +303,7 @@ export default function ChatPage() {
                 </p>
               </div>
             </div>
-          </div>
+          </React.Fragment>
         ))}
 
         {isSending && (

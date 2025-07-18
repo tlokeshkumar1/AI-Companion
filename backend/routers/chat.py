@@ -60,4 +60,3 @@ async def get_chat_history(user_id: str, bot_id: str):
 async def restart_chat(user_id: str, bot_id: str):
     chat_id = f"{user_id}_{bot_id}"
     await db.chats.delete_many({"chat_id": chat_id})
-    return {"message": "Chat restarted"}

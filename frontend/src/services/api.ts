@@ -28,17 +28,20 @@ export const createBot = (formData: FormData) =>
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 
-export const updateBot = (botId: string, formData: FormData) =>
+export const updateBot = (botId: string, formData: FormData, signal?: AbortSignal) =>
   API.put(`/bots/${botId}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    signal,
   });
 
-export const getBotById = (botId: string) => API.get(`/bots/${botId}`);
+export const getBotById = (id: string, signal?: AbortSignal) =>
+  API.get(`/bots/${id}`, signal ? { signal } : undefined);
 
-export const getMyBots = (userId: string) =>
-  API.get(`/bots/my?user_id=${userId}`);
+export const getMyBots = (userId: string, signal?: AbortSignal) =>
+  API.get(`/bots/my?user_id=${userId}`, signal ? { signal } : undefined);
 
-export const getPublicBots = () => API.get('/bots/public');
+export const getPublicBots = (signal?: AbortSignal) => 
+  API.get('/bots/public', signal ? { signal } : undefined);
 
 // ======================
 // Chat Endpoints
@@ -49,18 +52,26 @@ export const sendMessage = (payload: {
   message: string;
 }) => API.post('/chat/ask', payload);
 
-export const getChatHistory = async (userId: string, botId: string) => {
+export const getChatHistory = async (userId: string, botId: string, signal?: AbortSignal) => {
   try {
     console.log('Fetching chat history with params:', { userId, botId });
-    const response = await API.get(`/chat/history`, {
+    const config = {
       params: { 
         user_id: userId, 
         bot_id: botId 
-      }
-    });
+      },
+      ...(signal && { signal })
+    };
+    const response = await API.get(`/chat/history`, config);
     console.log('Chat history response:', response.data);
     return response.data;
   } catch (error: any) {
+    // Don't log cancellation errors
+    if (axios.isCancel(error) || error?.message === 'canceled') {
+      throw error; // Re-throw to be handled by the caller
+    }
+    
+    // Log other errors
     console.error('Error details:', {
       message: error.message,
       response: error.response?.data,
@@ -72,6 +83,6 @@ export const getChatHistory = async (userId: string, botId: string) => {
 };
 
 export const deleteChatHistory = (userId: string, botId: string) =>
-  API.delete(`/chat/history?user_id=${userId}&bot_id=${botId}`);
+  API.delete(`/chat/restart?user_id=${userId}&bot_id=${botId}`);
 
 export default API;
