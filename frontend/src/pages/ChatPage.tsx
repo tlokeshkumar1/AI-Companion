@@ -55,18 +55,32 @@ export default function ChatPage() {
           const historyResponse = await getChatHistory(userId, botId, controller.signal);
           if (!isMounted) return;
           
+          console.log('Bot data:', botResponse.data);
+          console.log('Chat history data:', historyResponse.data);
+          
           if (historyResponse.status === 'success') {
             // If no chat history, add the bot's first message
             if (Array.isArray(historyResponse.data) && historyResponse.data.length === 0) {
+              console.log('No chat history, adding welcome message');
               const welcomeMessage: ChatMessage = {
                 id: 'welcome-' + Date.now(),
                 message: '',
                 response: botResponse.data.first_message || 'Hello! How can I help you today?',
                 timestamp: new Date().toISOString()
               };
+              console.log('Setting welcome message:', welcomeMessage);
               setChat([welcomeMessage]);
             } else if (Array.isArray(historyResponse.data)) {
-              setChat(historyResponse.data);
+              console.log('Setting chat history data:', historyResponse.data);
+              // Ensure each message has the required fields
+              const formattedMessages = historyResponse.data.map((msg: ChatMessage) => ({
+                id: msg.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                message: msg.message || '',
+                response: msg.response || '',
+                timestamp: msg.timestamp || new Date().toISOString()
+              }));
+              console.log('Formatted messages:', formattedMessages);
+              setChat(formattedMessages);
             }
           }
         } catch (error: unknown) {
