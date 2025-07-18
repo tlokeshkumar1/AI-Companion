@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Bot, Upload, Save, ArrowLeft } from 'lucide-react';
+import { Bot, Save, ArrowLeft } from 'lucide-react';
 import { createBot, getBotById, updateBot } from '../services/api';
 
 export default function CreateBot() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
   const isEditing = Boolean(editId);
-  const [botId, setBotId] = useState<string | null>(editId);
+  // Removed unused state variables
   
   const [form, setForm] = useState({
     name: '',
@@ -44,19 +44,29 @@ export default function CreateBot() {
     try {
       const response = await getBotById(botId);
       const bot = response.data;
+      console.log('Loaded bot data:', bot); // Debug log
+      
       setForm({
-        name: bot.name,
-        bio: bot.bio,
-        first_message: bot.first_message,
-        situation: bot.situation,
-        back_story: bot.back_story,
-        personality: bot.personality,
-        chatting_way: bot.chatting_way,
-        type_of_bot: bot.type_of_bot,
-        privacy: bot.privacy,
+        name: bot.name || '',
+        bio: bot.bio || '',
+        first_message: bot.first_message || '',
+        situation: bot.situation || '',
+        back_story: bot.back_story || '',
+        personality: bot.personality || '',
+        chatting_way: bot.chatting_way || '',
+        type_of_bot: bot.type_of_bot || '',
+        privacy: bot.privacy || 'private',
       });
+      
       if (bot.avatar) {
-        setAvatarPreview(`http://localhost:8000/${bot.avatar}`);
+        // Check if the avatar is already a data URL (from file input)
+        // Check if the avatar path already includes 'http' or 'uploads/'
+        const avatarPath = bot.avatar.startsWith('http') 
+          ? bot.avatar 
+          : bot.avatar.startsWith('uploads/') 
+            ? `http://localhost:8000/${bot.avatar}`
+            : `http://localhost:8000/uploads/${bot.avatar}`;
+        setAvatarPreview(avatarPath);
       }
     } catch (error) {
       console.error('Error loading bot data:', error);
@@ -108,13 +118,32 @@ export default function CreateBot() {
     setMessage('');
     
     const formData = new FormData();
-    for (const key in form) {
-      formData.append(key, (form as any)[key]);
-    }
+    
+    // Add all form fields to formData
+    Object.entries(form).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        formData.append(key, String(value));
+      }
+    });
+    
     formData.append('user_id', userId!);
-    if (avatar) formData.append('avatar', avatar);
+    
+    // Only append avatar if it's a File object (new upload)
+    // If it's a string (existing avatar URL), don't include it in form data
+    if (avatar && avatar instanceof File) {
+      formData.append('avatar', avatar);
+    } else if (isEditing && !avatar) {
+      // If editing and no new avatar was selected, ensure we keep the existing one
+      // The backend should handle this case by preserving the existing avatar
+    }
 
     try {
+      console.log('Submitting form with data:', {
+        ...form,
+        hasAvatar: !!avatar,
+        isEditing
+      });
+      
       if (isEditing && editId) {
         await updateBot(editId, formData);
         setMessage('Bot updated successfully!');
@@ -122,6 +151,7 @@ export default function CreateBot() {
         await createBot(formData);
         setMessage('Bot created successfully!');
       }
+      
       setTimeout(() => navigate('/dashboard'), 2000);
     } catch (error) {
       console.error('Error saving bot:', error);
