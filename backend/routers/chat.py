@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 from utils.langchain_utils import chat_with_bot
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid, os, json
 from dotenv import load_dotenv
 load_dotenv()
@@ -10,6 +10,31 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 
 client = AsyncIOMotorClient(os.getenv("MONGODB_URI"))
 db = client["ai_companion"]
+
+def get_current_timestamp():
+    """Get current UTC timestamp as timezone-aware datetime object."""
+    return datetime.now(timezone.utc)
+
+def format_timestamp_for_response(timestamp):
+    """Format timestamp for API response with proper timezone handling."""
+    if not timestamp:
+        return get_current_timestamp().isoformat()
+    
+    if isinstance(timestamp, datetime):
+        # Ensure timezone awareness
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
+        return timestamp.isoformat()
+    elif isinstance(timestamp, str):
+        try:
+            # Validate the timestamp string
+            parsed = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            return parsed.isoformat()
+        except ValueError:
+            # If invalid, return current time
+            return get_current_timestamp().isoformat()
+    else:
+        return get_current_timestamp().isoformat()
 
 @router.post("/ask")
 async def ask(
@@ -32,7 +57,7 @@ async def ask(
             "response": response,
             "is_system_message": True,
             "message_id": message_id or str(uuid.uuid4()),
-            "timestamp": datetime.utcnow()
+            "timestamp": get_current_timestamp()
         })
         return {"status": "success", "message": "System message stored"}
     
@@ -52,7 +77,7 @@ async def ask(
         "message": message,
         "response": response,
         "message_id": message_id or str(uuid.uuid4()),
-        "timestamp": datetime.utcnow()
+        "timestamp": get_current_timestamp()
     })
 
     return {"status": "success", "response": response}
@@ -66,9 +91,8 @@ async def get_chat_history(user_id: str, bot_id: str):
         async for doc in db.chats.find({"chat_id": chat_id}).sort("timestamp", 1):
             # Convert ObjectId to string
             doc["_id"] = str(doc["_id"])
-            # Convert datetime to ISO format string
-            if "timestamp" in doc:
-                doc["timestamp"] = doc["timestamp"].isoformat()
+            # Format timestamp properly
+            doc["timestamp"] = format_timestamp_for_response(doc.get("timestamp"))
             history.append(doc)
         return {"status": "success", "data": history}
     except Exception as e:

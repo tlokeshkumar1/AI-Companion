@@ -5,6 +5,20 @@ import { Send, RotateCcw, ArrowLeft, Bot, User } from 'lucide-react';
 import { sendMessage, getChatHistory, getBotById, restartChat } from '../services/api';
 import { v4 as uuidv4 } from 'uuid';
 
+// Helper function to format timestamp
+const formatTimestamp = (timestamp: string): string => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  
+  if (isToday) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } else {
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + 
+           date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+};
+
 interface ChatMessage {
   id: string;
   message: string;
@@ -132,6 +146,7 @@ export default function ChatPage() {
       isMounted = false;
       controller.abort();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, botId, navigate]);
 
   useEffect(() => {
@@ -177,8 +192,8 @@ export default function ChatPage() {
           msg.id === messageId
             ? {
                 ...msg,
-                response: response.data.response || "I apologize, but I'm having trouble processing your request.",
-                timestamp: new Date().toISOString()
+                response: response.data.response || "I apologize, but I'm having trouble processing your request."
+                // Keep the original timestamp - don't overwrite it
               }
             : msg
         )
@@ -191,8 +206,8 @@ export default function ChatPage() {
           msg.id === messageId
             ? {
                 ...msg,
-                response: 'Sorry, there was an error processing your message. Please try again.',
-                timestamp: new Date().toISOString()
+                response: 'Sorry, there was an error processing your message. Please try again.'
+                // Keep the original timestamp - don't overwrite it
               }
             : msg
         )
@@ -325,7 +340,7 @@ export default function ChatPage() {
                     <p>{message.message}</p>
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
-                    {new Date(message.timestamp).toLocaleTimeString()}
+                    {formatTimestamp(message.timestamp)}
                   </p>
                 </div>
                 <div className="flex-shrink-0">
@@ -354,7 +369,7 @@ export default function ChatPage() {
                           if (fallback) fallback.classList.remove('hidden');
                         }}
                       />
-                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center hidden">
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full hidden items-center justify-center">
                         <Bot className="h-4 w-4 text-white" />
                       </div>
                     </div>
@@ -381,7 +396,7 @@ export default function ChatPage() {
                     )}
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
-                    {new Date(message.timestamp).toLocaleTimeString()}
+                    {formatTimestamp(message.timestamp)}
                   </p>
                 </div>
               </div>

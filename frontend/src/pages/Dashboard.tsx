@@ -31,6 +31,7 @@ export default function Dashboard() {
       return;
     }
     loadBots();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, navigate]);
 
   const loadBots = async () => {
@@ -64,12 +65,20 @@ export default function Dashboard() {
           if (response.data && response.data.length > 0) {
             const bot = allBots.find(b => b.bot_id === botId);
             const lastMessage: ChatMessage = response.data[response.data.length - 1];
+            
+            // Ensure we have a valid timestamp
+            let validTimestamp = lastMessage.timestamp;
+            if (!validTimestamp || isNaN(new Date(validTimestamp).getTime())) {
+              console.warn(`Invalid timestamp for bot ${botId}:`, lastMessage.timestamp);
+              validTimestamp = new Date().toISOString(); // fallback to current time
+            }
+            
             return {
               bot_id: botId,
               bot_name: bot?.name || 'Unknown Bot',
               bot_avatar: bot?.avatar,
               last_message: lastMessage.message || lastMessage.response || '',
-              timestamp: lastMessage.timestamp
+              timestamp: validTimestamp
             };
           }
           return null;
@@ -92,6 +101,10 @@ export default function Dashboard() {
           });
         }
       });
+      
+      // Sort by timestamp (most recent first)
+      validHistory.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      
       setChatHistory(validHistory);
     } catch (error) {
       console.error('Error loading chat history:', error);
@@ -118,14 +131,30 @@ export default function Dashboard() {
   }
 
   const formatTimeAgo = (timestamp: string) => {
+    if (!timestamp) return 'Unknown';
+    
     const date = new Date(timestamp);
+    
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid timestamp:', timestamp);
+      return 'Unknown';
+    }
+    
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    // Handle negative differences (future dates)
+    if (diffInSeconds < 0) {
+      console.warn('Future timestamp detected:', timestamp);
+      return 'Just now';
+    }
     
     if (diffInSeconds < 60) return 'Just now';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    return `${Math.floor(diffInSeconds / 604800)}w ago`;
   };
 
   // Toggle sidebar on mobile
