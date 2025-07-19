@@ -12,6 +12,8 @@ async def chat_with_bot(bot, user_message, chat_id):
         Chatting Style: {bot['chatting_way']}
         Your role is like a {bot['type_of_bot']}.
 
+        Respond naturally, casually, like a human texting, with short one-line replies — no long paragraphs, no formal tone, just chill and real.
+
         Start the chat from the perspective of {bot['name']} and continue accordingly.
 
         User: {user_message}
