@@ -165,6 +165,44 @@ async def update_bot(
         print("❌ Error in update_bot:", str(e))
         raise HTTPException(status_code=500, detail=f"Internal Error: {str(e)}")
 
+@router.delete("/{bot_id}")
+async def delete_bot(bot_id: str, user_id: str):
+    try:
+        bots = load_bots()
+        bot_index = -1
+        
+        # Find the bot to delete
+        for i, bot in enumerate(bots):
+            if bot.get("bot_id") == bot_id:
+                bot_index = i
+                break
+        
+        if bot_index == -1:
+            raise HTTPException(status_code=404, detail="Bot not found")
+        
+        # Check if the user owns this bot
+        if bots[bot_index].get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="You don't have permission to delete this bot")
+        
+        # Delete avatar file if it exists
+        avatar_path = bots[bot_index].get("avatar")
+        if avatar_path:
+            full_avatar_path = f"uploads/{avatar_path}"
+            if os.path.exists(full_avatar_path):
+                os.remove(full_avatar_path)
+        
+        # Remove the bot from the list
+        bots.pop(bot_index)
+        save_bots(bots)
+        
+        return {"message": "Bot deleted successfully", "bot_id": bot_id}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("❌ Error in delete_bot:", str(e))
+        raise HTTPException(status_code=500, detail=f"Internal Error: {str(e)}")
+
 @router.get("/{bot_id}")
 async def get_bot(bot_id: str):
     bots = load_bots()

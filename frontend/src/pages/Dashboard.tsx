@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, MessageCircle, ChevronRight, Menu, X } from 'lucide-react';
-import { getMyBots, getPublicBots, getChatHistory } from '../services/api';
+import { getMyBots, getPublicBots, getChatHistory, deleteBot } from '../services/api';
 import BotCard from '../components/BotCard';
 import { Bot, ChatMessage, ChatHistoryItem } from '../types';
 import { useMediaQuery } from 'react-responsive';
@@ -46,6 +46,17 @@ export default function Dashboard() {
       console.error('Error loading bots:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDeleteBot = async (botId: string) => {
+    try {
+      await deleteBot(botId, userId!);
+      // Reload bots after successful deletion
+      await loadBots();
+    } catch (error) {
+      console.error('Error deleting bot:', error);
+      throw error; // Re-throw to let BotCard handle the error display
     }
   };
 
@@ -325,7 +336,13 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
                 {myBots.length > 0 ? (
                   myBots.map((bot) => (
-                    <BotCard key={bot.bot_id} bot={bot} isOwner={true} onUpdate={loadBots} />
+                    <BotCard 
+                      key={bot.bot_id} 
+                      bot={bot} 
+                      isOwner={true} 
+                      onUpdate={loadBots}
+                      onDelete={handleDeleteBot}
+                    />
                   ))
                 ) : (
                   <div className="col-span-3 text-center py-10">

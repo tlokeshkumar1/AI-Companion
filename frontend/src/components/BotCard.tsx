@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Settings, Globe, Lock, User } from 'lucide-react';
+import { MessageCircle, Settings, Globe, Lock, User, Trash2 } from 'lucide-react';
 
 interface Bot {
   bot_id: string;
@@ -16,9 +16,10 @@ interface BotCardProps {
   bot: Bot;
   isOwner: boolean;
   onUpdate?: () => Promise<void>;
+  onDelete?: (botId: string) => Promise<void>;
 }
 
-export default function BotCard({ bot, isOwner }: BotCardProps) {
+export default function BotCard({ bot, isOwner, onDelete }: BotCardProps) {
   const navigate = useNavigate();
 
   const handleChatClick = () => {
@@ -29,6 +30,21 @@ export default function BotCard({ bot, isOwner }: BotCardProps) {
     e.stopPropagation();
     // Navigate to the edit page with the bot's ID
     navigate(`/createbot?edit=${bot.bot_id}`, { state: { botId: bot.bot_id } });
+  };
+
+  const handleDeleteClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (window.confirm(`Are you sure you want to delete "${bot.name}"? This action cannot be undone.`)) {
+      try {
+        if (onDelete) {
+          await onDelete(bot.bot_id);
+        }
+      } catch (error) {
+        console.error('Error deleting bot:', error);
+        alert('Failed to delete bot. Please try again.');
+      }
+    }
   };
 
   return (
@@ -83,12 +99,20 @@ export default function BotCard({ bot, isOwner }: BotCardProps) {
             Chat
           </button>
           {isOwner && (
-            <button
-              onClick={handleEditClick}
-              className="inline-flex items-center px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
-            >
-              <Settings className="h-4 w-4" />
-            </button>
+            <>
+              <button
+                onClick={handleEditClick}
+                className="inline-flex items-center px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+              <button
+                onClick={handleDeleteClick}
+                className="inline-flex items-center px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
           )}
         </div>
       </div>

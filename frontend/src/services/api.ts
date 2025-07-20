@@ -77,6 +77,9 @@ export const getMyBots = (userId: string, signal?: AbortSignal) =>
 export const getPublicBots = (signal?: AbortSignal) => 
   API.get('/bots/public', signal ? { signal } : undefined);
 
+export const deleteBot = (botId: string, userId: string) =>
+  API.delete(`/bots/${botId}?user_id=${userId}`);
+
 // ======================
 // Chat Endpoints
 // ======================
