@@ -1,6 +1,6 @@
 from pydantic import BaseModel
-from fastapi import APIRouter, UploadFile, Form, File, HTTPException
-import json, os, uuid
+from fastapi import APIRouter, HTTPException, Body
+import json, os, uuid, base64
 
 router = APIRouter(prefix="/bots", tags=["Bots"])
 
@@ -20,48 +20,54 @@ def save_bots(bots):
     with open(BOTS_FILE, "w") as f:
         json.dump(bots, f, indent=2)
 
+class BotCreate(BaseModel):
+    user_id: str
+    name: str
+    bio: str
+    first_message: str
+    situation: str
+    back_story: str
+    personality: str
+    chatting_way: str
+    type_of_bot: str
+    privacy: str
+    avatar_base64: str = None
+
+class BotUpdate(BaseModel):
+    user_id: str
+    name: str
+    bio: str
+    first_message: str
+    situation: str
+    back_story: str
+    personality: str
+    chatting_way: str
+    type_of_bot: str
+    privacy: str
+    avatar_base64: str = None
+
 @router.post("/createbot")
-async def create_bot(
-    user_id: str = Form(...),
-    name: str = Form(...),
-    bio: str = Form(...),
-    first_message: str = Form(...),
-    situation: str = Form(...),
-    back_story: str = Form(...),
-    personality: str = Form(...),
-    chatting_way: str = Form(...),
-    type_of_bot: str = Form(...),
-    privacy: str = Form(...),
-    avatar: UploadFile = File(None)  # ✅ FIXED HERE
-):
+async def create_bot(bot_data: BotCreate):
     # 🔽 DEBUG PRINT HERE
-    print("Received form data:", name, type_of_bot, avatar.filename if avatar else "No avatar")
+    print("Received bot data:", bot_data.name, bot_data.type_of_bot, "Has avatar:", bool(bot_data.avatar_base64))
 
     try:
         bots = load_bots()
         bot_id = str(uuid.uuid4())
-        avatar_path = None
-
-        if avatar:
-            os.makedirs("uploads", exist_ok=True)
-            filename = f"{bot_id}_{avatar.filename}"
-            avatar_path = filename  # Store just the filename, not the full path
-            with open(f"uploads/{filename}", "wb") as f:
-                f.write(await avatar.read())
 
         bot = {
             "bot_id": bot_id,
-            "user_id": user_id,
-            "name": name,
-            "bio": bio,
-            "first_message": first_message,
-            "situation": situation,
-            "back_story": back_story,
-            "personality": personality,
-            "chatting_way": chatting_way,
-            "type_of_bot": type_of_bot,
-            "privacy": privacy,
-            "avatar": avatar_path
+            "user_id": bot_data.user_id,
+            "name": bot_data.name,
+            "bio": bot_data.bio,
+            "first_message": bot_data.first_message,
+            "situation": bot_data.situation,
+            "back_story": bot_data.back_story,
+            "personality": bot_data.personality,
+            "chatting_way": bot_data.chatting_way,
+            "type_of_bot": bot_data.type_of_bot,
+            "privacy": bot_data.privacy,
+            "avatar_base64": bot_data.avatar_base64
         }
 
         bots.append(bot)
@@ -79,9 +85,6 @@ async def list_public_bots():
     public_bots = []
     for bot in bots:
         if bot.get("privacy") == "public":
-            if bot.get("avatar"):
-                # Ensure the avatar path is just the filename
-                bot["avatar"] = bot["avatar"].replace("uploads/", "").replace("avatars/", "")
             public_bots.append(bot)
     return public_bots
 
@@ -91,27 +94,11 @@ async def list_my_bots(user_id: str):
     my_bots = []
     for bot in bots:
         if bot.get("user_id") == user_id:
-            if bot.get("avatar"):
-                # Ensure the avatar path is just the filename
-                bot["avatar"] = bot["avatar"].replace("uploads/", "").replace("avatars/", "")
             my_bots.append(bot)
     return my_bots
 
 @router.put("/{bot_id}")
-async def update_bot(
-    bot_id: str,
-    user_id: str = Form(...),
-    name: str = Form(...),
-    bio: str = Form(...),
-    first_message: str = Form(...),
-    situation: str = Form(...),
-    back_story: str = Form(...),
-    personality: str = Form(...),
-    chatting_way: str = Form(...),
-    type_of_bot: str = Form(...),
-    privacy: str = Form(...),
-    avatar: UploadFile = File(None)
-):
+async def update_bot(bot_id: str, bot_data: BotUpdate):
     try:
         bots = load_bots()
         bot_index = -1
@@ -126,33 +113,21 @@ async def update_bot(
             raise HTTPException(status_code=404, detail="Bot not found")
         
         # Check if the user owns this bot
-        if bots[bot_index].get("user_id") != user_id:
+        if bots[bot_index].get("user_id") != bot_data.user_id:
             raise HTTPException(status_code=403, detail="You don't have permission to update this bot")
-        
-        # Handle avatar upload if provided
-        avatar_path = bots[bot_index].get("avatar")  # Keep existing avatar by default
-        
-        if avatar:
-            os.makedirs("uploads", exist_ok=True)
-            filename = f"{bot_id}_{avatar.filename}"
-            avatar_path = filename
-            
-            # Save the new avatar file
-            with open(f"uploads/{filename}", "wb") as f:
-                f.write(await avatar.read())
         
         # Update the bot data
         bots[bot_index].update({
-            "name": name,
-            "bio": bio,
-            "first_message": first_message,
-            "situation": situation,
-            "back_story": back_story,
-            "personality": personality,
-            "chatting_way": chatting_way,
-            "type_of_bot": type_of_bot,
-            "privacy": privacy,
-            "avatar": avatar_path
+            "name": bot_data.name,
+            "bio": bot_data.bio,
+            "first_message": bot_data.first_message,
+            "situation": bot_data.situation,
+            "back_story": bot_data.back_story,
+            "personality": bot_data.personality,
+            "chatting_way": bot_data.chatting_way,
+            "type_of_bot": bot_data.type_of_bot,
+            "privacy": bot_data.privacy,
+            "avatar_base64": bot_data.avatar_base64 if bot_data.avatar_base64 else bots[bot_index].get("avatar_base64")
         })
         
         save_bots(bots)
@@ -184,14 +159,7 @@ async def delete_bot(bot_id: str, user_id: str):
         if bots[bot_index].get("user_id") != user_id:
             raise HTTPException(status_code=403, detail="You don't have permission to delete this bot")
         
-        # Delete avatar file if it exists
-        avatar_path = bots[bot_index].get("avatar")
-        if avatar_path:
-            full_avatar_path = f"uploads/{avatar_path}"
-            if os.path.exists(full_avatar_path):
-                os.remove(full_avatar_path)
-        
-        # Remove the bot from the list
+        # Remove the bot from the list (no file deletion needed for base64)
         bots.pop(bot_index)
         save_bots(bots)
         
@@ -208,9 +176,5 @@ async def get_bot(bot_id: str):
     bots = load_bots()
     for bot in bots:
         if bot.get("bot_id") == bot_id:
-            # Fix avatar path if it starts with avatars/
-            if bot.get("avatar"):
-                # Ensure the avatar path is just the filename
-                bot["avatar"] = bot["avatar"].replace("uploads/", "").replace("avatars/", "")
             return bot
     raise HTTPException(status_code=404, detail="Bot not found")

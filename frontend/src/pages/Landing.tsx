@@ -9,9 +9,37 @@ type BotType = {
   name: string;
   type_of_bot: string;
   bio: string;
-  avatar: string | null;
+  avatar_base64: string | null;
   privacy: string;
 };
+
+// Fallback sample bots if no real bots exist
+const sampleBots = [
+  {
+    bot_id: 'sample-1',
+    name: "Sarah the Therapist",
+    type_of_bot: "Counselor",
+    bio: "A compassionate AI therapist ready to listen and provide emotional support",
+    avatar_base64: null,
+    privacy: 'public'
+  },
+  {
+    bot_id: 'sample-2',
+    name: "Code Master",
+    type_of_bot: "Developer",
+    bio: "Expert programming mentor to help you learn and solve coding challenges",
+    avatar_base64: null,
+    privacy: 'public'
+  },
+  {
+    bot_id: 'sample-3',
+    name: "Mom Bot",
+    type_of_bot: "Family",
+    bio: "Your caring virtual mom who's always there for advice and encouragement",
+    avatar_base64: null,
+    privacy: 'public'
+  }
+];
 
 export default function Landing() {
   const [featuredBots, setFeaturedBots] = useState<BotType[]>([]);
@@ -36,64 +64,33 @@ export default function Landing() {
     };
   }, []);
 
-  // Fallback sample bots if no real bots exist
-  const sampleBots = [
-    {
-      bot_id: 'sample-1',
-      name: "Sarah the Therapist",
-      type_of_bot: "Counselor",
-      bio: "A compassionate AI therapist ready to listen and provide emotional support",
-      avatar: null,
-      privacy: 'public'
-    },
-    {
-      bot_id: 'sample-2',
-      name: "Code Master",
-      type_of_bot: "Developer",
-      bio: "Expert programming mentor to help you learn and solve coding challenges",
-      avatar: null,
-      privacy: 'public'
-    },
-    {
-      bot_id: 'sample-3',
-      name: "Mom Bot",
-      type_of_bot: "Family",
-      bio: "Your caring virtual mom who's always there for advice and encouragement",
-      avatar: null,
-      privacy: 'public'
-    }
-  ];
-
   useEffect(() => {
+    const loadFeaturedBots = async () => {
+      try {
+        const response = await getPublicBots();
+        const publicBots = response.data;
+        
+        if (publicBots && publicBots.length > 0) {
+          // Show up to 6 featured bots, or all if less than 6
+          setFeaturedBots(publicBots.slice(0, 6));
+        } else {
+          // Use sample bots if no real bots exist
+          setFeaturedBots(sampleBots);
+        }
+      } catch (error) {
+        console.error('Error loading featured bots:', error);
+        // Fallback to sample bots on error
+        setFeaturedBots(sampleBots);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     loadFeaturedBots();
   }, []);
 
-  const loadFeaturedBots = async () => {
-    try {
-      const response = await getPublicBots();
-      const publicBots = response.data;
-      
-      if (publicBots && publicBots.length > 0) {
-        // Show up to 6 featured bots, or all if less than 6
-        setFeaturedBots(publicBots.slice(0, 6));
-      } else {
-        // Use sample bots if no real bots exist
-        setFeaturedBots(sampleBots);
-      }
-    } catch (error) {
-      console.error('Error loading featured bots:', error);
-      // Fallback to sample bots on error
-      setFeaturedBots(sampleBots);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const getAvatarUrl = (bot: BotType) => {
-    if (bot.avatar) {
-      return `http://localhost:8000/uploads/${bot.avatar}`;
-    }
-    return null;
+    return bot.avatar_base64 || null;
   };
 
   return (

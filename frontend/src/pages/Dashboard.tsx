@@ -87,7 +87,7 @@ export default function Dashboard() {
             return {
               bot_id: botId,
               bot_name: bot?.name || 'Unknown Bot',
-              bot_avatar: bot?.avatar,
+              bot_avatar_base64: bot?.avatar_base64,
               last_message: lastMessage.message || lastMessage.response || '',
               timestamp: validTimestamp
             };
@@ -106,7 +106,7 @@ export default function Dashboard() {
           validHistory.push({
             bot_id: item.bot_id,
             bot_name: item.bot_name,
-            bot_avatar: item.bot_avatar,
+            bot_avatar_base64: item.bot_avatar_base64,
             last_message: item.last_message,
             timestamp: item.timestamp
           });
@@ -222,7 +222,7 @@ export default function Dashboard() {
                 >
                   <div className="flex items-center space-x-3">
                     <img 
-                      src={chat.bot_avatar ? `http://localhost:8000/uploads/${chat.bot_avatar}` : defaultAvatar} 
+                      src={chat.bot_avatar_base64 || defaultAvatar} 
                       alt={chat.bot_name}
                       className="h-10 w-10 rounded-full object-cover"
                       onError={(e) => {

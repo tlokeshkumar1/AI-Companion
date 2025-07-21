@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth, bots, chat
 import uvicorn
@@ -33,11 +32,6 @@ from routers import auth, bots, chat
 app.include_router(auth.router)
 app.include_router(bots.router)
 app.include_router(chat.router)
-
-# Mount the 'uploads' directory to serve static files
-if not os.path.exists("uploads"):
-    os.makedirs("uploads")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 @app.get("/")
 async def root():

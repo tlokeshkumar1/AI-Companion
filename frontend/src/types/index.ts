@@ -1,7 +1,7 @@
 export interface Bot {
   bot_id: string;
   name: string;
-  avatar?: string;
+  avatar_base64?: string;
   type_of_bot: string;
   privacy: 'public' | 'private';
   bio: string;
@@ -21,7 +21,7 @@ export interface ChatMessage {
 export interface ChatHistoryItem {
   bot_id: string;
   bot_name: string;
-  bot_avatar?: string;
+  bot_avatar_base64?: string;
   last_message: string;
   timestamp: string;
 }

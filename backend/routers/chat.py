@@ -47,6 +47,13 @@ async def ask(
 ):
     chat_id = f"{user_id}_{bot_id}"
     
+    # Load bot data to get avatar_base64
+    with open("bots_data.json", "r") as f:
+        bots = json.load(f)
+    bot = next((b for b in bots if b["bot_id"] == bot_id), None)
+    if not bot:
+        return {"status": "error", "message": "Bot not found"}
+
     # If it's a system message (like bot's first message), store it directly
     if is_system_message and response:
         await db.chats.insert_one({
@@ -57,17 +64,14 @@ async def ask(
             "response": response,
             "is_system_message": True,
             "message_id": message_id or str(uuid.uuid4()),
-            "timestamp": get_current_timestamp()
+            "timestamp": get_current_timestamp(),
+            "bot_avatar_base64": bot.get("avatar_base64"),
+            "previous_update": None,
+            "updated": get_current_timestamp()
         })
         return {"status": "success", "message": "System message stored"}
     
     # Normal user message flow
-    with open("bots_data.json", "r") as f:
-        bots = json.load(f)
-    bot = next((b for b in bots if b["bot_id"] == bot_id), None)
-    if not bot:
-        return {"status": "error", "message": "Bot not found"}
-
     response = await chat_with_bot(bot, message, chat_id)
 
     await db.chats.insert_one({
@@ -77,7 +81,10 @@ async def ask(
         "message": message,
         "response": response,
         "message_id": message_id or str(uuid.uuid4()),
-        "timestamp": get_current_timestamp()
+        "timestamp": get_current_timestamp(),
+        "bot_avatar_base64": bot.get("avatar_base64"),
+        "previous_update": None,
+        "updated": get_current_timestamp()
     })
 
     return {"status": "success", "response": response}

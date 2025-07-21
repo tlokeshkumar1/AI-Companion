@@ -21,7 +21,7 @@ export default function CreateBot() {
     privacy: 'private',
   });
   
-  const [avatar, setAvatar] = useState<File | null>(null);
+  const [avatarBase64, setAvatarBase64] = useState<string>('');
   const [avatarPreview, setAvatarPreview] = useState<string>('');
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -58,15 +58,9 @@ export default function CreateBot() {
         privacy: bot.privacy || 'private',
       });
       
-      if (bot.avatar) {
-        // Check if the avatar is already a data URL (from file input)
-        // Check if the avatar path already includes 'http' or 'uploads/'
-        const avatarPath = bot.avatar.startsWith('http') 
-          ? bot.avatar 
-          : bot.avatar.startsWith('uploads/') 
-            ? `http://localhost:8000/${bot.avatar}`
-            : `http://localhost:8000/uploads/${bot.avatar}`;
-        setAvatarPreview(avatarPath);
+      if (bot.avatar_base64) {
+        setAvatarBase64(bot.avatar_base64);
+        setAvatarPreview(bot.avatar_base64);
       }
     } catch (error) {
       console.error('Error loading bot data:', error);
@@ -84,10 +78,11 @@ export default function CreateBot() {
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setAvatar(file);
       const reader = new FileReader();
       reader.onload = (e) => {
-        setAvatarPreview(e.target?.result as string);
+        const base64String = e.target?.result as string;
+        setAvatarBase64(base64String);
+        setAvatarPreview(base64String);
       };
       reader.readAsDataURL(file);
     }
@@ -117,38 +112,24 @@ export default function CreateBot() {
     setIsLoading(true);
     setMessage('');
     
-    const formData = new FormData();
-    
-    // Add all form fields to formData
-    Object.entries(form).forEach(([key, value]) => {
-      if (value !== null && value !== undefined) {
-        formData.append(key, String(value));
-      }
-    });
-    
-    formData.append('user_id', userId!);
-    
-    // Only append avatar if it's a File object (new upload)
-    // If it's a string (existing avatar URL), don't include it in form data
-    if (avatar && avatar instanceof File) {
-      formData.append('avatar', avatar);
-    } else if (isEditing && !avatar) {
-      // If editing and no new avatar was selected, ensure we keep the existing one
-      // The backend should handle this case by preserving the existing avatar
-    }
+    const botData = {
+      ...form,
+      user_id: userId!,
+      avatar_base64: avatarBase64 || null
+    };
 
     try {
-      console.log('Submitting form with data:', {
+      console.log('Submitting bot data:', {
         ...form,
-        hasAvatar: !!avatar,
+        hasAvatar: !!avatarBase64,
         isEditing
       });
       
       if (isEditing && editId) {
-        await updateBot(editId, formData);
+        await updateBot(editId, botData);
         setMessage('Bot updated successfully!');
       } else {
-        await createBot(formData);
+        await createBot(botData);
         setMessage('Bot created successfully!');
       }
       

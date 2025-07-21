@@ -4,7 +4,7 @@ import { MessageCircle, Settings, Globe, Lock, User, Trash2 } from 'lucide-react
 
 interface Bot {
   bot_id: string;
-  avatar?: string;
+  avatar_base64?: string;
   name: string;
   type_of_bot: string;
   privacy: 'public' | 'private';
@@ -51,24 +51,23 @@ export default function BotCard({ bot, isOwner, onDelete }: BotCardProps) {
     <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow border border-slate-200 overflow-hidden">
       <div className="p-6">
         <div className="flex items-center mb-4">
-          {bot.avatar ? (
+          {bot.avatar_base64 ? (
             <img
-              src={`http://localhost:8000/uploads/${bot.avatar}`}
+              src={bot.avatar_base64}
               alt={bot.name}
               onError={(e) => {
                 // If image fails to load, show the default avatar
                 const target = e.target as HTMLImageElement;
                 target.onerror = null;
-                target.src = '';
-                target.parentElement!.querySelector('svg')?.classList.remove('hidden');
+                target.style.display = 'none';
+                target.parentElement!.querySelector('.default-avatar')?.classList.remove('hidden');
               }}
               className="w-16 h-16 rounded-full object-cover mr-4"
             />
-          ) : (
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mr-4">
-              <User className="h-8 w-8 text-white" />
-            </div>
-          )}
+          ) : null}
+          <div className={`w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mr-4 default-avatar ${bot.avatar_base64 ? 'hidden' : ''}`}>
+            <User className="h-8 w-8 text-white" />
+          </div>
           <div className="flex-1">
             <h3 className="text-xl font-semibold text-slate-900">{bot.name}</h3>
             <div className="flex items-center mt-1">

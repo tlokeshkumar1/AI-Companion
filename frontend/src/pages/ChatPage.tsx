@@ -34,7 +34,7 @@ export default function ChatPage() {
   interface Bot {
     id: string;
     name: string;
-    avatar?: string;
+    avatar_base64?: string;
     type_of_bot?: string;
     first_message?: string;
   }
@@ -290,13 +290,13 @@ export default function ChatPage() {
           
           {bot && (
             <div className="flex items-center">
-              {bot.avatar ? (
+              {bot.avatar_base64 ? (
                 <img
-                  src={bot.avatar.startsWith('http') ? bot.avatar : `http://localhost:8000/uploads/${bot.avatar}`}
+                  src={bot.avatar_base64}
                   alt={bot.name}
                   className="w-10 h-10 rounded-full object-cover mr-3"
                   onError={(e) => {
-                    console.error('Error loading avatar:', bot.avatar);
+                    console.error('Error loading avatar:', bot.avatar_base64);
                     // Fallback to default avatar if image fails to load
                     e.currentTarget.style.display = 'none';
                     e.currentTarget.nextElementSibling?.classList.remove('hidden');
@@ -355,14 +355,14 @@ export default function ChatPage() {
             {message.response && (
               <div className="flex items-start space-x-3 mb-4">
                 <div className="flex-shrink-0">
-                  {bot?.avatar ? (
+                  {bot?.avatar_base64 ? (
                     <div className="relative">
                       <img
-                        src={bot.avatar.startsWith('http') ? bot.avatar : `http://localhost:8000/uploads/${bot.avatar}`}
+                        src={bot.avatar_base64}
                         alt={bot.name}
                         className="w-8 h-8 rounded-full object-cover"
                         onError={(e) => {
-                          console.error('Error loading avatar:', bot.avatar);
+                          console.error('Error loading avatar:', bot.avatar_base64);
                           const img = e.currentTarget;
                           img.style.display = 'none';
                           const fallback = img.nextElementSibling as HTMLElement;
