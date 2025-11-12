@@ -16,6 +16,8 @@ db = client["ai_companion"]
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+# In-memory storage for pending users (in production, use Redis or similar)
+pending_users = {}
 
 @router.post("/signup")
 async def signup(
@@ -30,10 +32,15 @@ async def signup(
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="User already exists")
 
+    # Check if user is already in pending state
+    if email in pending_users:
+        raise HTTPException(status_code=400, detail="Verification already sent. Please check your email.")
+
     # Generate OTP
     otp = random.randint(100000, 999999)
     
-    user = {
+    # Store user data temporarily with OTP
+    pending_users[email] = {
         "user_id": str(uuid.uuid4()),
         "full_name": full_name,
         "email": email,
@@ -42,8 +49,6 @@ async def signup(
         "otp": str(otp),
         "otp_created_at": datetime.utcnow()
     }
-
-    await db.users.insert_one(user)
 
     try:
         # Send welcome email with OTP
@@ -55,11 +60,10 @@ async def signup(
         }
     except Exception as e:
         print(f"[ERROR] Email sending failed: {e}")
-        # If email sending fails, we still create the user but they'll need to request OPP again
-        return {
-            "message": "Account created but failed to send verification email. Please request a new code.",
-            "email_sent": False
-        }
+        # Remove user from pending if email fails
+        if email in pending_users:
+            del pending_users[email]
+        raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again.")
 
 
 @router.post("/login")
@@ -152,25 +156,33 @@ async def verify_password_reset_otp(
 
 @router.post("/email-verification")
 async def email_verification(email: EmailStr = Body(...), otp: str = Body(...)):
-    user = await db.users.find_one({"email": email})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    # Check if user exists in pending users
+    if email not in pending_users:
+        raise HTTPException(status_code=404, detail="No pending signup found for this email")
+    
+    user_data = pending_users[email]
     
     # Check if OTP exists and is not expired (10 minutes)
-    otp_created_at = user.get("otp_created_at")
+    otp_created_at = user_data.get("otp_created_at")
     if not otp_created_at or (datetime.utcnow() - otp_created_at) > timedelta(minutes=10):
-        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
-    
+        # Remove expired pending user
+        del pending_users[email]
+        raise HTTPException(status_code=400, detail="OTP has expired. Please sign up again.")
+
     # Verify OTP
-    if user.get("otp") != otp:
+    if user_data.get("otp") != otp:
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
-    # Mark user as verified and clear OTP
-    await db.users.update_one(
-        {"email": email}, 
-        {
-            "$set": {"is_verified": True},
-            "$unset": {"otp": "", "otp_created_at": ""}
-        }
-    )
-    return {"message": "Email verified successfully"}
+    # Add user to database
+    user_to_insert = user_data.copy()
+    user_to_insert["is_verified"] = True
+    # Remove OTP fields as they're no longer needed
+    del user_to_insert["otp"]
+    del user_to_insert["otp_created_at"]
+    
+    await db.users.insert_one(user_to_insert)
+    
+    # Remove from pending users
+    del pending_users[email]
+    
+    return {"message": "Email verified successfully. Account created."}

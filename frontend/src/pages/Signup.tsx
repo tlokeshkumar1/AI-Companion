@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { User, Mail, Lock, Eye, EyeOff, Key } from 'lucide-react';
 import { signupUser, verifyEmail } from '../services/api';
@@ -12,7 +12,6 @@ export default function Signup() {
     verification_code: ''
   });
   const [showVerification, setShowVerification] = useState(false);
-  const [generatedCode, setGeneratedCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
@@ -22,14 +21,6 @@ export default function Signup() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
     if (error) setError('');
-  };
-
-  // Generate a random 6-digit OTP as a string
-  const generateVerificationCode = () => {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedCode(code);
-    console.log('Generated OTP:', code); // For debugging
-    return code;
   };
 
   const handleSignup = async () => {
@@ -44,8 +35,8 @@ export default function Signup() {
     }
 
     try {
-      await signupUser(form);
-      return true;
+      const response = await signupUser(form);
+      return response.data.email_sent; // Return whether email was sent successfully
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Signup failed. Please try again.');
       return false;
@@ -59,10 +50,9 @@ export default function Signup() {
     }
 
     try {
-      // Send the OTP as a string to match backend expectations
       await verifyEmail({ 
         email: form.email, 
-        otp: form.verification_code // No need to parse as number
+        otp: form.verification_code
       });
       return true;
     } catch (err: any) {
@@ -83,14 +73,11 @@ export default function Signup() {
         // First step: Sign up
         const signupSuccess = await handleSignup();
         if (signupSuccess) {
-          // Generate and show verification code
-          const code = generateVerificationCode();
-          console.log('Verification code generated:', code);
+          // Show verification input after successful signup
           setShowVerification(true);
         }
       } else {
         // Second step: Verify email
-        console.log('Verifying code:', form.verification_code);
         const verificationSuccess = await handleVerification();
         if (verificationSuccess) {
           navigate('/login', { 
